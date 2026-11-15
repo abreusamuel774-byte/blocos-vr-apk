@@ -169,8 +169,7 @@ function updateSbs(on){stereo=on;$('optSbs').checked=on;$('sbsQuick').textConten
 function orientationQuaternion(alpha,beta,gamma,orient){const e=new THREE.Euler(beta*Math.PI/180,alpha*Math.PI/180,-gamma*Math.PI/180,'YXZ');const q=new THREE.Quaternion().setFromEuler(e);const q1=new THREE.Quaternion(-Math.sqrt(.5),0,0,Math.sqrt(.5));const q0=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),-orient*Math.PI/180);return q.multiply(q1).multiply(q0);}
 function onDeviceOrientation(e){if(!gyroOn||e.alpha==null)return;const o=screen.orientation?.angle||window.orientation||0;const q=orientationQuaternion(e.alpha,e.beta||0,e.gamma||0,o);if(!gyroBase){gyroBase=q.clone().invert();}gyroCurrent=gyroBase.clone().multiply(q);camera.quaternion.copy(gyroCurrent);}
 async function enableGyro(){try{if(typeof DeviceOrientationEvent==='undefined'){setToast('Este navegador não oferece giroscópio.');return;}if(typeof DeviceOrientationEvent.requestPermission==='function'){const p=await DeviceOrientationEvent.requestPermission();if(p!=='granted'){setToast('Permissão do giroscópio não concedida.');return;}}gyroBase=null;gyroOn=true;window.addEventListener('deviceorientation',onDeviceOrientation,true);$('optGyro').checked=true;$('gyroQuick').textContent='🧭 3DOF ON';setToast('Giroscópio ligado. Vire o celular para olhar!');}catch(e){setToast('Não foi possível ativar o giroscópio.');}}
-function disableGyro(){gyroOn=false;window.removeEventListener('deviceorientation',onDeviceOrientation,true);camera.rotation.set(cameraPitch,cameraYaw,0,'YXZ');$('optGyro').checked=false;$('gyroQuick').textContent='🧭 3DOF';}
-async function startHandTracking(){
+setToast('Giroscópio ligado. Vire o celular para olhar!');
  if(!navigator.mediaDevices?.getUserMedia){setToast('Câmera não disponível. Abra o site em HTTPS.');return;}
  try{
   if(handStream)handStream.getTracks().forEach(t=>t.stop());
