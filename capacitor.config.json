@@ -1,0 +1,9 @@
+{
+  "appId": "com.blocosvr.game",
+  "appName": "BLOCOS VR",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
+}

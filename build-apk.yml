@@ -1,0 +1,63 @@
+name: Build BLOCOS VR APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar projeto
+        uses: actions/checkout@v4
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Configurar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Configurar Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Instalar dependências do projeto
+        run: npm install
+
+      - name: Baixar modelo de detecção de mãos para uso offline
+        run: |
+          mkdir -p public/vendor
+          curl -L --fail --retry 3 \
+            "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task" \
+            -o public/vendor/hand_landmarker.task
+
+      - name: Preparar arquivos locais do jogo
+        run: npm run prepare:web
+
+      - name: Criar projeto Android
+        run: npx cap add android
+
+      - name: Configurar câmera e modo paisagem
+        run: node scripts/patch-android.mjs
+
+      - name: Sincronizar aplicativo
+        run: npx cap sync android
+
+      - name: Compilar APK de teste
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Disponibilizar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: BLOCOS-VR-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
