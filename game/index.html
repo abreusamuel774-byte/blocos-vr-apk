@@ -169,19 +169,130 @@ function updateSbs(on){stereo=on;$('optSbs').checked=on;$('sbsQuick').textConten
 function orientationQuaternion(alpha,beta,gamma,orient){const e=new THREE.Euler(beta*Math.PI/180,alpha*Math.PI/180,-gamma*Math.PI/180,'YXZ');const q=new THREE.Quaternion().setFromEuler(e);const q1=new THREE.Quaternion(-Math.sqrt(.5),0,0,Math.sqrt(.5));const q0=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),-orient*Math.PI/180);return q.multiply(q1).multiply(q0);}
 function onDeviceOrientation(e){if(!gyroOn||e.alpha==null)return;const o=screen.orientation?.angle||window.orientation||0;const q=orientationQuaternion(e.alpha,e.beta||0,e.gamma||0,o);if(!gyroBase){gyroBase=q.clone().invert();}gyroCurrent=gyroBase.clone().multiply(q);camera.quaternion.copy(gyroCurrent);}
 async function enableGyro(){try{if(typeof DeviceOrientationEvent==='undefined'){setToast('Este navegador não oferece giroscópio.');return;}if(typeof DeviceOrientationEvent.requestPermission==='function'){const p=await DeviceOrientationEvent.requestPermission();if(p!=='granted'){setToast('Permissão do giroscópio não concedida.');return;}}gyroBase=null;gyroOn=true;window.addEventListener('deviceorientation',onDeviceOrientation,true);$('optGyro').checked=true;$('gyroQuick').textContent='🧭 3DOF ON';setToast('Giroscópio ligado. Vire o celular para olhar!');}catch(e){setToast('Não foi possível ativar o giroscópio.');}}
-setToast('Giroscópio ligado. Vire o celular para olhar!');
- if(!navigator.mediaDevices?.getUserMedia){setToast('Câmera não disponível. Abra o site em HTTPS.');return;}
+async function enableGyro(){
+ try{
+  if(typeof DeviceOrientationEvent==='undefined'){
+   setToast('Este navegador não oferece giroscópio.');
+   return;
+  }
+  if(typeof DeviceOrientationEvent.requestPermission==='function'){
+   const p=await DeviceOrientationEvent.requestPermission();
+   if(p!=='granted'){
+    setToast('Permissão do giroscópio não concedida.');
+    return;
+   }
+  }
+  gyroBase=null;
+  gyroOn=true;
+  window.addEventListener('deviceorientation',onDeviceOrientation,true);
+  $('optGyro').checked=true;
+  $('gyroQuick').textContent='🧭 3DOF ON';
+  setToast('Giroscópio ligado. Vire o celular para olhar!');
+ }catch(e){
+  setToast('Não foi possível ativar o giroscópio.');
+ }
+}
+
+function disableGyro(){
+ gyroOn=false;
+ window.removeEventListener('deviceorientation',onDeviceOrientation,true);
+ gyroBase=null;
+ gyroCurrent=null;
+ $('optGyro').checked=false;
+ $('gyroQuick').textContent='🧭 3DOF';
+ camera.rotation.set(cameraPitch,cameraYaw,0,'YXZ');
+ setToast('Giroscópio desligado.');
+}
+
+async function startHandTracking(){
+ if(!navigator.mediaDevices?.getUserMedia){
+  setToast('Câmera não disponível. Abra em HTTPS.');
+  return;
+ }
  try{
   if(handStream)handStream.getTracks().forEach(t=>t.stop());
-  handStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:$('cameraFacing').value,width:{ideal:640},height:{ideal:480}},audio:false});const video=$('cameraVideo');video.srcObject=handStream;await video.play();
-  setToast('Câmera ligada. Carregando rastreador de mãos...');
-  const vision=await import('./vendor/mediapipe/vision_bundle.mjs');const files=await vision.FilesetResolver.forVisionTasks('./vendor/mediapipe/wasm');
-  const handOptions={baseOptions:{modelAssetPath:'./vendor/hand_landmarker.task'},runningMode:'VIDEO',numHands:2};try{handTask=await vision.HandLandmarker.createFromOptions(files,{...handOptions,baseOptions:{...handOptions.baseOptions,delegate:'GPU'}});}catch(gpuError){handTask=await vision.HandLandmarker.createFromOptions(files,{...handOptions,baseOptions:{...handOptions.baseOptions,delegate:'CPU'}});}handsOn=true;$('optHands').checked=true;$('handLabel').textContent='Mãos: procurando';setToast('Mãos ativadas! Mostre as mãos para a câmera.');
- }catch(e){handsOn=false;$('optHands').checked=false;$('handLabel').textContent='Mãos: erro';setToast('Não consegui iniciar as mãos. Confira a permissão da câmera.');if(handStream){handStream.getTracks().forEach(t=>t.stop());handStream=null;}console.warn(e);}
+
+  handStream=await navigator.mediaDevices.getUserMedia({
+   video:{
+    facingMode:$('cameraFacing').value,
+    width:{ideal:640},
+    height:{ideal:480}
+   },
+   audio:false
+  });
+
+  const video=$('cameraVideo');
+  video.srcObject=handStream;
+  await video.play();
+
+  setToast('Câmera ligada. Carregando rastreador...');
+
+  const vision=await import('./vendor/mediapipe/vision_bundle.mjs');
+  const files=await vision.FilesetResolver.forVisionTasks('./vendor/mediapipe/wasm');
+
+  const options={
+   baseOptions:{modelAssetPath:'./vendor/hand_landmarker.task'},
+   runningMode:'VIDEO',
+   numHands:2
+  };
+
+  try{
+   handTask=await vision.HandLandmarker.createFromOptions(files,{
+    ...options,
+    baseOptions:{...options.baseOptions,delegate:'GPU'}
+   });
+  }catch(e){
+   handTask=await vision.HandLandmarker.createFromOptions(files,{
+    ...options,
+    baseOptions:{...options.baseOptions,delegate:'CPU'}
+   });
+  }
+
+  handsOn=true;
+  $('optHands').checked=true;
+  $('handLabel').textContent='Mãos: procurando';
+  setToast('Mãos ativadas!');
+
+ }catch(e){
+  handsOn=false;
+  $('optHands').checked=false;
+  $('handLabel').textContent='Mãos: erro';
+
+  if(handStream){
+   handStream.getTracks().forEach(t=>t.stop());
+   handStream=null;
+  }
+
+  setToast('Erro ao iniciar a câmera ou as mãos.');
+  console.warn(e);
+ }
 }
-function stopHandTracking(){handsOn=false;handTask=null;if(handStream){handStream.getTracks().forEach(t=>t.stop());handStream=null;}hands.forEach(h=>h.visible=false);$('handLabel').textContent='Mãos: desligadas';$('optHands').checked=false;}
-let lastHandDetect=0,lastGesture=0;function processHands(now){if(!handsOn||!handTask||$('cameraVideo').readyState<2||now-lastHandDetect<55)return;lastHandDetect=now;try{const res=handTask.detectForVideo($('cameraVideo'),now);const seen=[false,false];if(res.landmarks){for(let i=0;i<res.landmarks.length;i++){const pts=res.landmarks[i],label=res.handednesses?.[i]?.[0]?.categoryName||'Right';const idx=label.toLowerCase()==='left'?0:1;seen[idx]=true;const arm=hands[idx];arm.visible=true;const x=(.5-pts[0].x)*1.0,y=(.46-pts[0].y)*.72;arm.position.set((idx===0?-1:1)*.04+x,y,-.78);const a=pts[0],b=pts[9];arm.rotation.z=THREE.MathUtils.clamp((b.x-a.x)*2,-.65,.65);const dx=pts[4].x-pts[8].x,dy=pts[4].y-pts[8].y;const pinch=Math.hypot(dx,dy)<.055;const fist=pts[8].y>pts[6].y&&pts[12].y>pts[10].y&&pts[16].y>pts[14].y;
-  if(now-lastGesture>750){if(pinch){placeTarget();lastGesture=now;}else if(fist){breakTarget();lastGesture=now;}}
+
+function stopHandTracking(){
+ handsOn=false;
+ handTask=null;
+
+ if(handStream){
+  handStream.getTracks().forEach(t=>t.stop());
+  handStream=null;
+ }
+
+ hands.forEach(h=>h.visible=false);
+ $('handLabel').textContent='Mãos: desligadas';
+ $('optHands').checked=false;
+                                   }
+
+
+
+
+
+
+
+
+
+
+
+
  } }hands.forEach((h,i)=>{if(!seen[i])h.visible=false;});$('handLabel').textContent=res.landmarks?.length?'Mãos: detectadas':'Mãos: procurando';}catch(e){console.warn(e);}}
 function setCameraLook(dx,dy){if(gyroOn)return;cameraYaw-=dx*.004;cameraPitch-=dy*.004;cameraPitch=THREE.MathUtils.clamp(cameraPitch,-1.35,1.35);camera.rotation.set(cameraPitch,cameraYaw,0,'YXZ');}
 // Botões e menus
