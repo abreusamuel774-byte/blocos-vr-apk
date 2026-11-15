@@ -1,65 +1,65 @@
 name: Build BLOCOS VR APK
 
 on:
-workflow_dispatch:
-push:
-branches: [main]
+  workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
-build:
-runs-on: ubuntu-latest
-steps:
-- name: Baixar projeto
-uses: actions/checkout@v4
+  build:
+    runs-on: ubuntu-latest
 
-  - name: Configurar Node
-    uses: actions/setup-node@v4
-    with:
-      node-version: 22
+    steps:
+      - name: Baixar projeto
+        uses: actions/checkout@v4
 
-  - name: Configurar Java
-    uses: actions/setup-java@v4
-    with:
-      distribution: temurin
-      java-version: 21
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
-  - name: Configurar Android SDK
-    uses: android-actions/setup-android@v3
-    with:
-      packages: 'platform-tools'
+      - name: Configurar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
 
-  - name: Instalar dependências do projeto
-    run: npm install
+      - name: Configurar Android SDK
+        uses: android-actions/setup-android@v4
 
-  - name: Baixar modelo de detecção de mãos para uso offline
-    run: |
-      mkdir -p public/vendor
-      curl -L --fail --retry 3 \
-        "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task" \
-        -o public/vendor/hand_landmarker.task
+      - name: Instalar dependências do projeto
+        run: npm install
 
-  - name: Preparar arquivos locais do jogo
-    run: npm run prepare:web
+      - name: Baixar modelo de detecção de mãos
+        run: |
+          mkdir -p public/vendor
+          curl -L --fail --retry 3 \
+            "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task" \
+            -o public/vendor/hand_landmarker.task
 
-  - name: Criar projeto Android
-    run: npx cap add android
+      - name: Preparar arquivos locais do jogo
+        run: npm run prepare:web
 
-  - name: Configurar câmera e modo paisagem
-    run: node scripts/patch-android.mjs
+      - name: Criar projeto Android
+        run: npx cap add android
 
-  - name: Sincronizar aplicativo
-    run: npx cap sync android
+      - name: Configurar câmera e modo paisagem
+        run: node scripts/patch-android.mjs
 
-  - name: Compilar APK de teste
-    run: |
-      cd android
-      chmod +x gradlew
-      ./gradlew assembleDebug
+      - name: Sincronizar aplicativo
+        run: npx cap sync android
 
-  - name: Disponibilizar APK
-    uses: actions/upload-artifact@v4
-    with:
-      name: BLOCOS-VR-APK
-      path: android/app/build/outputs/apk/debug/app-debug.apk
-      if-no-files-found: error
-      retention-days: 14
+      - name: Compilar APK de teste
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Disponibilizar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: BLOCOS-VR-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
