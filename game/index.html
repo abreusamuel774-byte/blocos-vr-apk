@@ -171,13 +171,17 @@ function onDeviceOrientation(e){if(!gyroOn||e.alpha==null)return;const o=screen.
 async function enableGyro(){try{if(typeof DeviceOrientationEvent==='undefined'){setToast('Este navegador não oferece giroscópio.');return;}if(typeof DeviceOrientationEvent.requestPermission==='function'){const p=await DeviceOrientationEvent.requestPermission();if(p!=='granted'){setToast('Permissão do giroscópio não concedida.');return;}}gyroBase=null;gyroOn=true;window.addEventListener('deviceorientation',onDeviceOrientation,true);$('optGyro').checked=true;$('gyroQuick').textContent='🧭 3DOF ON';setToast('Giroscópio ligado. Vire o celular para olhar!');}catch(e){setToast('Não foi possível ativar o giroscópio.');}}
 async function enableGyro(){
  try{
+
+ $('optHands').checked=false 
+async function enableGyro(){
+ try{
   if(typeof DeviceOrientationEvent==='undefined'){
    setToast('Este navegador não oferece giroscópio.');
    return;
   }
   if(typeof DeviceOrientationEvent.requestPermission==='function'){
-   const p=await DeviceOrientationEvent.requestPermission();
-   if(p!=='granted'){
+   const permission=await DeviceOrientationEvent.requestPermission();
+   if(permission!=='granted'){
     setToast('Permissão do giroscópio não concedida.');
     return;
    }
@@ -188,7 +192,8 @@ async function enableGyro(){
   $('optGyro').checked=true;
   $('gyroQuick').textContent='🧭 3DOF ON';
   setToast('Giroscópio ligado. Vire o celular para olhar!');
- }catch(e){
+ }catch(error){
+  console.warn(error);
   setToast('Não foi possível ativar o giroscópio.');
  }
 }
@@ -210,8 +215,7 @@ async function startHandTracking(){
   return;
  }
  try{
-  if(handStream)handStream.getTracks().forEach(t=>t.stop());
-
+  if(handStream)handStream.getTracks().forEach(track=>track.stop());
   handStream=await navigator.mediaDevices.getUserMedia({
    video:{
     facingMode:$('cameraFacing').value,
@@ -220,79 +224,83 @@ async function startHandTracking(){
    },
    audio:false
   });
-
   const video=$('cameraVideo');
   video.srcObject=handStream;
   await video.play();
-
   setToast('Câmera ligada. Carregando rastreador...');
 
   const vision=await import('./vendor/mediapipe/vision_bundle.mjs');
   const files=await vision.FilesetResolver.forVisionTasks('./vendor/mediapipe/wasm');
-
   const options={
    baseOptions:{modelAssetPath:'./vendor/hand_landmarker.task'},
    runningMode:'VIDEO',
    numHands:2
   };
-
   try{
    handTask=await vision.HandLandmarker.createFromOptions(files,{
     ...options,
     baseOptions:{...options.baseOptions,delegate:'GPU'}
    });
-  }catch(e){
+  }catch(gpuError){
    handTask=await vision.HandLandmarker.createFromOptions(files,{
     ...options,
     baseOptions:{...options.baseOptions,delegate:'CPU'}
    });
   }
-
   handsOn=true;
   $('optHands').checked=true;
   $('handLabel').textContent='Mãos: procurando';
-  setToast('Mãos ativadas!');
-
- }catch(e){
+  setToast('Rastreamento das mãos ativado!');
+ }catch(error){
   handsOn=false;
+  handTask=null;
   $('optHands').checked=false;
   $('handLabel').textContent='Mãos: erro';
-
   if(handStream){
-   handStream.getTracks().forEach(t=>t.stop());
+   handStream.getTracks().forEach(track=>track.stop());
    handStream=null;
   }
-
-  setToast('Erro ao iniciar a câmera ou as mãos.');
-  console.warn(e);
+  setToast('Erro ao iniciar a câmera ou o rastreador das mãos.');
+  console.warn(error);
  }
 }
 
 function stopHandTracking(){
  handsOn=false;
  handTask=null;
-
  if(handStream){
-  handStream.getTracks().forEach(t=>t.stop());
+  handStream.getTracks().forEach(track=>track.stop());
   handStream=null;
  }
-
- hands.forEach(h=>h.visible=false);
+ hands.forEach(hand=>hand.visible=false);
  $('handLabel').textContent='Mãos: desligadas';
  $('optHands').checked=false;
-                                   }
+}
 
-
-
-
-
-
-
-
-
-
-
-
+function processHands(now){
+ if(!handsOn||!handTask)return;
+ const video=$('cameraVideo');
+ if(!video||video.readyState<2)return;
+ try{
+  const result=handTask.detectForVideo(video,now);
+  const landmarks=result.landmarks||[];
+  hands.forEach((arm,index)=>{
+   const points=landmarks[index];
+   if(!points||!points.length){
+    arm.visible=false;
+    return;
+   }
+   arm.visible=true;
+   const wrist=points[0];
+   const side=index===0?-1:1;
+   arm.position.x=side*.34+(0.5-wrist.x)*.35;
+   arm.position.y=-.3+(0.5-wrist.y)*.45;
+   if(points[8]){
+    const tip=points[8];
+    arm.rotation.z=Math.atan2(tip.y-wrist.y,tip.x-wrist.x)*.15
+  $('handLabel').textContent=landmarks.length?'Mãos: detectadas':'Mãos: procurando';
+ }catch(error){
+  console.warn('Falha no rastreamento das mãos:',error);
  } }hands.forEach((h,i)=>{if(!seen[i])h.visible=false;});$('handLabel').textContent=res.landmarks?.length?'Mãos: detectadas':'Mãos: procurando';}catch(e){console.warn(e);}}
 function setCameraLook(dx,dy){if(gyroOn)return;cameraYaw-=dx*.004;cameraPitch-=dy*.004;cameraPitch=THREE.MathUtils.clamp(cameraPitch,-1.35,1.35);camera.rotation.set(cameraPitch,cameraYaw,0,'YXZ');}
 // Botões e menus
